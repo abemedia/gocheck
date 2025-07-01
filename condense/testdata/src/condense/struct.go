@@ -1,0 +1,49 @@
+package collapse
+
+func _() {
+	type myStruct struct {
+		A string
+		B int
+	}
+
+	// no change
+	_ = myStruct{A: "1", B: 2}
+
+	// condense onto a single line
+	_ = myStruct{ // want "condense declaration onto a single line"
+		A: "1",
+		B: 2,
+	}
+
+	// condense nested struct with long string
+	_ = myStruct{
+		A: "123456789890123456789890123456789890123456789890123456789890123456789890123456789890123456789890123456789890123456789890",
+		B: myStruct{ // want "condense declaration onto a single line"
+			A: "6",
+			B: 7,
+		}.B,
+	}
+
+	// don't condense struct with line comments
+	_ = myStruct{
+		A: "1", // comment
+		B: 2,
+	}
+	_ = myStruct{
+		A: "1",
+		B: 2, // comment
+	}
+	_ = myStruct{
+		A: "1", // comment
+		B: 2,   // comment
+	}
+
+	// condense nested struct with line comments
+	_ = myStruct{
+		A: "5", // comment
+		B: myStruct{ // want "condense declaration onto a single line"
+			A: "6",
+			B: 7,
+		}.B,
+	}
+}

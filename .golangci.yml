@@ -1,0 +1,65 @@
+version: '2'
+
+run:
+  build-tags:
+    - acceptance
+
+issues:
+  fix: true
+
+linters:
+  default: all
+  disable:
+    - depguard
+    - exhaustive
+    - exhaustruct
+    - forcetypeassert
+    - gochecknoglobals
+    - gocyclo
+    - lll
+    - mnd
+    - nlreturn
+    - paralleltest
+    - varnamelen
+    - wrapcheck
+    - wsl
+  settings:
+    cyclop:
+      max-complexity: 20
+    govet:
+      enable-all: true
+      disable: [fieldalignment]
+    nolintlint:
+      require-specific: true
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - std-error-handling
+    rules:
+      - linters: [errcheck]
+        path: (.+)_test.go
+      - linters: [govet]
+        text: 'shadow: declaration of "err" shadows declaration'
+    paths:
+      - testdata
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: interface{}
+          replacement: any
+    goimports:
+      local-prefixes:
+        - github.com/abemedia/goneat
+    gofumpt:
+      extra-rules: true
+    golines:
+      max-len: 120
+      tab-len: 2

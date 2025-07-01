@@ -1,0 +1,78 @@
+package collapse
+
+func _() {
+	type myStruct struct {
+		A string
+		B int
+	}
+
+	// no change on single line
+	_ = []myStruct{{A: "1", B: 1}, {A: "2", B: 2}}
+
+	// no change on multiple lines
+	_ = []myStruct{
+		{A: "123456789890123456789890123456789890123456789890", B: 1},
+		{A: "123456789890123456789890123456789890123456789890", B: 2},
+	}
+
+	// condense onto a single line
+	_ = []myStruct{ // want "condense declaration onto a single line"
+		{
+			A: "1",
+			B: 1,
+		},
+		{
+			A: "2",
+			B: 2,
+		},
+	}
+
+	// condense elements
+	_ = []myStruct{ // want "condense element declarations onto a single line"
+		{
+			A: "123456789890123456789890123456789890123456789890",
+			B: 1,
+		},
+		{
+			A: "123456789890123456789890123456789890123456789890",
+			B: 2,
+		},
+	}
+
+	// condense elements and add line breaks
+	_ = []myStruct{{ // want "condense element declarations onto a single line"
+		A: "123456789890123456789890123456789890123456789890",
+		B: 1,
+	}, {
+		A: "123456789890123456789890123456789890123456789890",
+		B: 2,
+	}}
+
+	// don't condense elements with line comments
+	_ = []myStruct{
+		{
+			A: "123456789890123456789890123456789890123456789890", // comment
+			B: 1,                                                  // comment
+		},
+		{
+			A: "123456789890123456789890123456789890123456789890", // comment
+			B: 2,
+		},
+		{
+			A: "123456789890123456789890123456789890123456789890",
+			B: 2, // comment
+		},
+	}
+
+	// don't condense elements with line comments 2
+	_ = []myStruct{{
+		A: "123456789890123456789890123456789890123456789890", // comment
+		B: 1,                                                  // comment
+	}, {
+		A: "123456789890123456789890123456789890123456789890", // comment
+		B: 2,
+	}, {
+		A: "123456789890123456789890123456789890123456789890",
+		B: 2, // comment
+	}}
+}
