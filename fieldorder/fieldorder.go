@@ -23,6 +23,7 @@ func NewAnalyzer() *analysis.Analyzer {
 	}
 }
 
+//nolint:funlen,gocognit
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {

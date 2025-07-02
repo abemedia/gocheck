@@ -31,7 +31,7 @@ func TestCollapseLine(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		result, ok := collapseLine([]byte(test.input))
+		result, ok := condense([]byte(test.input))
 		if string(result) != test.result {
 			t.Errorf("collapseLine(`%s`) = `%s`, want `%s`", test.input, result, test.result)
 		}

@@ -31,108 +31,44 @@ func run(pass *analysis.Pass) (any, error) {
 
 	for _, f := range pass.Files {
 		ast.Inspect(f, func(n ast.Node) bool {
-			cl, ok := n.(*ast.CompositeLit)
-			if !ok {
+			if n == nil || pass.Fset.Position(n.Pos()).Line == pass.Fset.Position(n.End()).Line {
+				return false // Skip processing nodes that are already on one line.
+			}
+
+			switch node := n.(type) {
+			case *ast.CompositeLit:
+				return handleCompositeLit(pass, f, node, maxLen)
+			case *ast.FuncLit:
+				return handleFuncLit(pass, f, node, maxLen)
+			case *ast.FuncDecl:
+				return handleFuncDecl(pass, f, node, maxLen)
+			case *ast.CallExpr:
+				return handleCallExpr(pass, f, node, maxLen)
+			default:
 				return true
 			}
-
-			if hasLineComment(cl, f) {
-				return true
-			}
-			var sb bytes.Buffer
-			_ = printer.Fprint(&sb, pass.Fset, cl)
-			line, ok := collapseLine(sb.Bytes())
-			if !ok {
-				return false
-			}
-
-			var edits []analysis.TextEdit
-			if len(line) <= maxLen {
-				edits = append(edits, analysis.TextEdit{Pos: cl.Pos(), End: cl.End(), NewText: line})
-			}
-
-			if len(line) <= maxLen {
-				pass.Report(analysis.Diagnostic{
-					Pos:            cl.Pos(),
-					End:            cl.End(),
-					Message:        "condense declaration onto a single line",
-					SuggestedFixes: []analysis.SuggestedFix{{Message: "Condense declaration", TextEdits: edits}},
-				})
-				return false
-			}
-
-			// Large slice: collapse elements individually and ensure line breaks around each.
-			arrayType, isSlice := cl.Type.(*ast.ArrayType)
-			if isSlice && arrayType != nil {
-				var edits []analysis.TextEdit
-
-				// Insert newline after opening brace if needed
-				if e, ok := insertNewline(pass.Fset, cl.Lbrace, cl.Elts[0].Pos()); ok {
-					edits = append(edits, e)
-				}
-
-				// Condense each element and insert newlines between them
-				for i, elt := range cl.Elts {
-					if hasLineComment(elt, f) {
-						continue
-					}
-
-					var eltBuf bytes.Buffer
-					_ = printer.Fprint(&eltBuf, pass.Fset, elt)
-					collapsedElt, ok := collapseLine(eltBuf.Bytes())
-					if !ok {
-						continue
-					}
-
-					if len(collapsedElt) <= maxLen {
-						edits = append(edits, analysis.TextEdit{
-							Pos:     elt.Pos(),
-							End:     elt.End(),
-							NewText: collapsedElt,
-						})
-					}
-
-					// Insert newline after each element explicitly if next element is inline
-					if i < len(cl.Elts)-1 {
-						if e, ok := insertNewline(pass.Fset, elt.End(), cl.Elts[i+1].Pos()); ok {
-							edits = append(edits, e)
-						}
-					}
-				}
-
-				// Insert newline before closing brace if last element inline
-				lastElt := cl.Elts[len(cl.Elts)-1]
-				if pass.Fset.Position(lastElt.End()).Line == pass.Fset.Position(cl.Rbrace).Line {
-					edits = append(edits, analysis.TextEdit{Pos: cl.Rbrace, End: cl.Rbrace, NewText: []byte(",\n")})
-				}
-
-				if len(edits) > 0 {
-					pass.Report(analysis.Diagnostic{
-						Pos:     cl.Pos(),
-						End:     cl.End(),
-						Message: "condense element declarations onto a single line",
-						SuggestedFixes: []analysis.SuggestedFix{
-							{Message: "Condense elements individually", TextEdits: edits},
-						},
-					})
-				}
-				return false
-			}
-
-			return true
 		})
 	}
 
 	return nil, nil //nolint:nilnil
 }
 
-func hasLineComment(node ast.Node, file *ast.File) bool {
-	for _, group := range file.Comments {
-		if group.Pos() >= node.Pos() && group.End() <= node.End() {
-			for _, comment := range group.List {
-				if strings.HasPrefix(comment.Text, "//") &&
-					(!testing.Testing() || !strings.HasPrefix(comment.Text, "// want")) {
-					return true
+func hasLineComment[T interface {
+	ast.Node
+	comparable
+}](file *ast.File, nodes ...T) bool {
+	var zero T
+	for _, node := range nodes {
+		if node == zero {
+			continue
+		}
+		for _, group := range file.Comments {
+			if group.Pos() >= node.Pos() && group.End() <= node.End() {
+				for _, comment := range group.List {
+					if strings.HasPrefix(comment.Text, "//") &&
+						(!testing.Testing() || !strings.HasPrefix(comment.Text, "// want")) {
+						return true
+					}
 				}
 			}
 		}
@@ -140,7 +76,54 @@ func hasLineComment(node ast.Node, file *ast.File) bool {
 	return false
 }
 
-func collapseLine(b []byte) ([]byte, bool) {
+func condenseNode(fset *token.FileSet, f *ast.File, node ast.Node, maxLen int) (analysis.TextEdit, bool) {
+	if node == nil || hasLineComment(f, node) {
+		return analysis.TextEdit{}, false // Skip nodes with line comments
+	}
+
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, node); err != nil {
+		return analysis.TextEdit{}, false
+	}
+
+	line, ok := condense(buf.Bytes())
+	if !ok {
+		return analysis.TextEdit{}, false
+	}
+
+	if len(line) > maxLen {
+		return analysis.TextEdit{}, false
+	}
+
+	return analysis.TextEdit{Pos: node.Pos(), End: node.End(), NewText: line}, true
+}
+
+// condenseFieldList condenses a field list (parameters or returns) onto a single line.
+func condenseFieldList(fset *token.FileSet, f *ast.File, fields *ast.FieldList) (analysis.TextEdit, bool) {
+	if fields == nil || len(fields.List) == 0 || hasLineComment(f, fields) {
+		return analysis.TextEdit{}, false
+	}
+
+	funcType := &ast.FuncType{Func: token.NoPos, TypeParams: fields}
+
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, funcType); err != nil {
+		return analysis.TextEdit{}, false
+	}
+
+	original := buf.Bytes()
+	fieldListText := original[bytes.IndexByte(original, '[')+1 : bytes.LastIndexByte(original, ']')]
+
+	line, ok := condense(fieldListText)
+	if !ok {
+		return analysis.TextEdit{}, false
+	}
+
+	return analysis.TextEdit{Pos: fields.Pos() + 1, End: fields.End() - 1, NewText: bytes.Trim(line, " \n\r\t,")}, true
+}
+
+//nolint:cyclop,gocognit
+func condense(b []byte) ([]byte, bool) {
 	if bytes.IndexByte(b, '\n') == -1 {
 		return nil, false
 	}

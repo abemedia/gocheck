@@ -1,4 +1,4 @@
-package collapse
+package condense
 
 func _() {
 	type myStruct struct {
@@ -16,7 +16,7 @@ func _() {
 	}
 
 	// condense onto a single line
-	_ = []myStruct{ // want "condense declaration onto a single line"
+	_ = []myStruct{ // want "condense declaration"
 		{
 			A: "1",
 			B: 1,
@@ -28,7 +28,7 @@ func _() {
 	}
 
 	// condense elements
-	_ = []myStruct{ // want "condense element declarations onto a single line"
+	_ = []myStruct{ // want "condense declaration"
 		{
 			A: "123456789890123456789890123456789890123456789890",
 			B: 1,
@@ -40,7 +40,7 @@ func _() {
 	}
 
 	// condense elements and add line breaks
-	_ = []myStruct{{ // want "condense element declarations onto a single line"
+	_ = []myStruct{{ // want "condense declaration"
 		A: "123456789890123456789890123456789890123456789890",
 		B: 1,
 	}, {
