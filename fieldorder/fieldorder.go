@@ -120,5 +120,5 @@ func run(pass *analysis.Pass) (any, error) {
 		})
 	}
 
-	return nil, nil //nolint:nilnil
+	return nil, nil
 }
