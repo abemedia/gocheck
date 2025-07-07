@@ -4,13 +4,11 @@ package main
 import (
 	"golang.org/x/tools/go/analysis/multichecker"
 
-	"github.com/abemedia/goneat/condense"
 	"github.com/abemedia/goneat/fieldorder"
 )
 
 func main() {
 	multichecker.Main(
 		fieldorder.NewAnalyzer(),
-		condense.NewAnalyzer(),
 	)
 }
