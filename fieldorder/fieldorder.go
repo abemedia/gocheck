@@ -26,6 +26,10 @@ func NewAnalyzer() *analysis.Analyzer {
 //nolint:funlen,gocognit
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
+		if ast.IsGenerated(file) {
+			continue
+		}
+
 		ast.Inspect(file, func(n ast.Node) bool {
 			cl, ok := n.(*ast.CompositeLit)
 			if !ok || cl.Type == nil || len(cl.Elts) == 0 {
