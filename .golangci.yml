@@ -18,11 +18,13 @@ linters:
     - gocyclo
     - lll
     - mnd
+    - nilnil
     - nlreturn
     - paralleltest
     - varnamelen
     - wrapcheck
     - wsl
+    - wsl_v5
   settings:
     cyclop:
       max-complexity: 20
@@ -35,6 +37,7 @@ linters:
     generated: lax
     presets:
       - common-false-positives
+      - legacy
       - std-error-handling
     rules:
       - linters: [errcheck]
