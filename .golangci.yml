@@ -60,7 +60,7 @@ formatters:
           replacement: any
     goimports:
       local-prefixes:
-        - github.com/abemedia/goneat
+        - github.com/abemedia/gocheck
     gofumpt:
       extra-rules: true
     golines:

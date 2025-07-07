@@ -1,4 +1,4 @@
-module github.com/abemedia/goneat
+module github.com/abemedia/gocheck
 
 go 1.24.4
 
