@@ -23,6 +23,7 @@ func NewAnalyzer() *analysis.Analyzer {
 	}
 }
 
+//nolint:funlen,gocognit
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {
@@ -35,6 +36,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if typ == nil {
 				return true
 			}
+
 			st, ok := typ.Underlying().(*types.Struct)
 			if !ok {
 				return true
@@ -54,13 +56,16 @@ func run(pass *analysis.Pass) (any, error) {
 				if !ok {
 					continue
 				}
+
 				ident, ok := kv.Key.(*ast.Ident)
 				if !ok {
 					continue
 				}
+
 				if _, exists := fieldOrder[ident.Name]; !exists {
 					continue
 				}
+
 				keyValueExprs = append(keyValueExprs, kv)
 			}
 
@@ -79,6 +84,7 @@ func run(pass *analysis.Pass) (any, error) {
 			}
 
 			var edits []analysis.TextEdit
+
 			if needsReordering {
 				// Sort keyValueExprs by field order
 				sortedExprs := slices.Clone(keyValueExprs)
@@ -91,6 +97,7 @@ func run(pass *analysis.Pass) (any, error) {
 					sorted := sortedExprs[i]
 					if unsorted != sorted {
 						var buf bytes.Buffer
+
 						_ = printer.Fprint(&buf, pass.Fset, sorted)
 						edits = append(edits, analysis.TextEdit{Pos: unsorted.Pos(), End: unsorted.End(), NewText: buf.Bytes()})
 					}
