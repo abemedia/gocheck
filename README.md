@@ -1,6 +1,6 @@
-<img align="right" width="200" alt="" src="assets/logo.png">
-
 # gocheck
+
+<img align="right" width="200" alt="" src="assets/logo.png">
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/abemedia/gocheck.svg)](https://pkg.go.dev/github.com/abemedia/gocheck)
 [![Codecov](https://codecov.io/gh/abemedia/gocheck/branch/master/graph/badge.svg)](https://codecov.io/gh/abemedia/gocheck)
