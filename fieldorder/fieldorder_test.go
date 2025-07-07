@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/abemedia/goneat/fieldorder"
+	"github.com/abemedia/gocheck/fieldorder"
 )
 
 func TestFieldOrder(t *testing.T) {

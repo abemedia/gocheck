@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/abemedia/goneat/untested"
+	"github.com/abemedia/gocheck/untested"
 )
 
 func TestUntested(t *testing.T) {

@@ -1,11 +1,11 @@
-// Package main contains the goneat command.
+// Package main contains the gocheck command.
 package main
 
 import (
 	"golang.org/x/tools/go/analysis/multichecker"
 
-	"github.com/abemedia/goneat/fieldorder"
-	"github.com/abemedia/goneat/untested"
+	"github.com/abemedia/gocheck/fieldorder"
+	"github.com/abemedia/gocheck/untested"
 )
 
 func main() {
