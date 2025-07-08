@@ -87,7 +87,7 @@ func TestExportedFunction(t *testing.T) {
 Install the latest version:
 
 ```bash
-go install github.com/abemedia/gocheck/cmd/gocheck@latest
+go install github.com/abemedia/gocheck@latest
 ```
 
 ## Usage
