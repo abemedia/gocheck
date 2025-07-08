@@ -8,7 +8,11 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/abemedia/gocheck/internal/skip"
 )
 
 var (
@@ -20,9 +24,10 @@ var (
 // without corresponding tests.
 func NewAnalyzer() *analysis.Analyzer {
 	analyzer := &analysis.Analyzer{
-		Name: "untested",
-		Doc:  "check that exported functions and methods have tests",
-		Run:  run,
+		Name:     "untested",
+		Doc:      "check that exported functions and methods have tests",
+		Run:      run,
+		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
 
 	analyzer.Flags.BoolVar(&internalFlag, "internal", false, "check functions in internal packages")
@@ -39,24 +44,21 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 
+	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	var exportedFunctions []*ast.FuncDecl
 
-	for _, file := range pass.Files {
+	shouldSkip := skip.NewFileStrategy(pass, func(file *ast.File) bool {
 		filename := pass.Fset.Position(file.Pos()).Filename
+		return strings.HasSuffix(filename, "_test.go") || (!generatedFlag && ast.IsGenerated(file))
+	})
 
-		if strings.HasSuffix(filename, "_test.go") || !generatedFlag && ast.IsGenerated(file) {
-			continue
+	nodeFilter := []ast.Node{(*ast.FuncDecl)(nil)}
+	inspect.Preorder(nodeFilter, func(n ast.Node) {
+		funcDecl := n.(*ast.FuncDecl)
+		if funcDecl.Name.IsExported() && !shouldSkip(funcDecl) {
+			exportedFunctions = append(exportedFunctions, funcDecl)
 		}
-
-		ast.Inspect(file, func(n ast.Node) bool {
-			if funcDecl, ok := n.(*ast.FuncDecl); ok {
-				if funcDecl.Name.IsExported() {
-					exportedFunctions = append(exportedFunctions, funcDecl)
-				}
-			}
-			return true
-		})
-	}
+	})
 
 	// If no exported functions, nothing to check
 	if len(exportedFunctions) == 0 {

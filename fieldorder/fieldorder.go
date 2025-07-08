@@ -11,118 +11,120 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/abemedia/gocheck/internal/skip"
 )
 
 // NewAnalyzer creates a new analysis.Analyzer that checks struct literal
 // fields are in the same order as the type declaration.
 func NewAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
-		Name: "fieldorder",
-		Doc:  "check that struct literal fields are in the same order as the type declaration",
-		Run:  run,
+		Name:     "fieldorder",
+		Doc:      "check that struct literal fields are in the same order as the type declaration",
+		Run:      run,
+		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
 }
 
 //nolint:funlen,gocognit
 func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		if ast.IsGenerated(file) {
-			continue
+	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	nodeFilter := []ast.Node{(*ast.CompositeLit)(nil)}
+
+	shouldSkip := skip.NewFileStrategy(pass, ast.IsGenerated)
+
+	inspect.Preorder(nodeFilter, func(n ast.Node) {
+		cl := n.(*ast.CompositeLit)
+		if cl.Type == nil || len(cl.Elts) == 0 || shouldSkip(cl) {
+			return
 		}
 
-		ast.Inspect(file, func(n ast.Node) bool {
-			cl, ok := n.(*ast.CompositeLit)
-			if !ok || cl.Type == nil || len(cl.Elts) == 0 {
-				return true
-			}
+		typ := pass.TypesInfo.TypeOf(cl.Type)
+		if typ == nil {
+			return
+		}
 
-			typ := pass.TypesInfo.TypeOf(cl.Type)
-			if typ == nil {
-				return true
-			}
+		st, ok := typ.Underlying().(*types.Struct)
+		if !ok {
+			return
+		}
 
-			st, ok := typ.Underlying().(*types.Struct)
+		// Build declared field order map
+		fieldOrder := make(map[string]int)
+		for i := range st.NumFields() {
+			fieldOrder[st.Field(i).Name()] = i
+		}
+		// Check if fields are in the correct order
+		needsReordering := false
+		keyValueExprs := make([]*ast.KeyValueExpr, 0, len(cl.Elts))
+
+		for _, elt := range cl.Elts {
+			kv, ok := elt.(*ast.KeyValueExpr)
 			if !ok {
-				return true
+				continue
 			}
 
-			// Build declared field order map
-			fieldOrder := make(map[string]int)
-			for i := range st.NumFields() {
-				fieldOrder[st.Field(i).Name()] = i
-			}
-			// Check if fields are in the correct order
-			needsReordering := false
-			keyValueExprs := make([]*ast.KeyValueExpr, 0, len(cl.Elts))
-
-			for _, elt := range cl.Elts {
-				kv, ok := elt.(*ast.KeyValueExpr)
-				if !ok {
-					continue
-				}
-
-				ident, ok := kv.Key.(*ast.Ident)
-				if !ok {
-					continue
-				}
-
-				if _, exists := fieldOrder[ident.Name]; !exists {
-					continue
-				}
-
-				keyValueExprs = append(keyValueExprs, kv)
+			ident, ok := kv.Key.(*ast.Ident)
+			if !ok {
+				continue
 			}
 
-			// Check if current order matches declared order
-			for i := range len(keyValueExprs) - 1 {
-				ident1 := keyValueExprs[i].Key.(*ast.Ident)
-				ident2 := keyValueExprs[i+1].Key.(*ast.Ident)
-
-				idx1 := fieldOrder[ident1.Name]
-				idx2 := fieldOrder[ident2.Name]
-
-				if idx1 > idx2 {
-					needsReordering = true
-					break
-				}
+			if _, exists := fieldOrder[ident.Name]; !exists {
+				continue
 			}
 
-			var edits []analysis.TextEdit
+			keyValueExprs = append(keyValueExprs, kv)
+		}
 
-			if needsReordering {
-				// Sort keyValueExprs by field order
-				sortedExprs := slices.Clone(keyValueExprs)
-				slices.SortFunc(sortedExprs, func(a, b *ast.KeyValueExpr) int {
-					return cmp.Compare(fieldOrder[a.Key.(*ast.Ident).Name], fieldOrder[b.Key.(*ast.Ident).Name])
-				})
+		// Check if current order matches declared order
+		for i := range len(keyValueExprs) - 1 {
+			ident1 := keyValueExprs[i].Key.(*ast.Ident)
+			ident2 := keyValueExprs[i+1].Key.(*ast.Ident)
 
-				// Create edits for each pair that needs swapping
-				for i, unsorted := range keyValueExprs {
-					sorted := sortedExprs[i]
-					if unsorted != sorted {
-						var buf bytes.Buffer
+			idx1 := fieldOrder[ident1.Name]
+			idx2 := fieldOrder[ident2.Name]
 
-						_ = printer.Fprint(&buf, pass.Fset, sorted)
-						edits = append(edits, analysis.TextEdit{Pos: unsorted.Pos(), End: unsorted.End(), NewText: buf.Bytes()})
-					}
+			if idx1 > idx2 {
+				needsReordering = true
+				break
+			}
+		}
+
+		var edits []analysis.TextEdit
+
+		if needsReordering {
+			// Sort keyValueExprs by field order
+			sortedExprs := slices.Clone(keyValueExprs)
+			slices.SortFunc(sortedExprs, func(a, b *ast.KeyValueExpr) int {
+				return cmp.Compare(fieldOrder[a.Key.(*ast.Ident).Name], fieldOrder[b.Key.(*ast.Ident).Name])
+			})
+
+			// Create edits for each pair that needs swapping
+			for i, unsorted := range keyValueExprs {
+				sorted := sortedExprs[i]
+				if unsorted != sorted {
+					var buf bytes.Buffer
+
+					_ = printer.Fprint(&buf, pass.Fset, sorted)
+					edits = append(edits, analysis.TextEdit{Pos: unsorted.Pos(), End: unsorted.End(), NewText: buf.Bytes()})
 				}
 			}
+		}
 
-			if len(edits) > 0 {
-				pass.Report(analysis.Diagnostic{
-					Pos:      cl.Lbrace,
-					End:      cl.Rbrace + 1,
-					Category: "style",
-					Message:  "struct literal fields are out of order",
-					SuggestedFixes: []analysis.SuggestedFix{
-						{Message: "Reorder fields to match declaration order", TextEdits: edits},
-					},
-				})
-			}
-
-			return true
-		})
-	}
+		if len(edits) > 0 {
+			pass.Report(analysis.Diagnostic{
+				Pos:      cl.Lbrace,
+				End:      cl.Rbrace + 1,
+				Category: "style",
+				Message:  "struct literal fields are out of order",
+				SuggestedFixes: []analysis.SuggestedFix{
+					{Message: "Reorder fields to match declaration order", TextEdits: edits},
+				},
+			})
+		}
+	})
 
 	return nil, nil
 }
