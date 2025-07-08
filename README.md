@@ -1,6 +1,6 @@
-<img align="right" width="200" alt="" src="assets/logo.png">
-
 # gocheck
+
+<img align="right" width="160" alt="" src="assets/logo.png">
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/abemedia/gocheck.svg)](https://pkg.go.dev/github.com/abemedia/gocheck)
 [![Codecov](https://codecov.io/gh/abemedia/gocheck/branch/master/graph/badge.svg)](https://codecov.io/gh/abemedia/gocheck)
@@ -54,8 +54,8 @@ Checks that exported functions and methods have corresponding tests, including i
 #### Example
 
 ```go
-// main.go
-package main
+// example.go
+package example
 
 // ✅ Function has tests
 func ExportedFunction() string {
@@ -67,8 +67,8 @@ func ExportedUntested() string {
     return "not tested"
 }
 
-// main_test.go
-package main
+// example_test.go
+package example
 
 import "testing"
 
@@ -92,44 +92,43 @@ go install github.com/abemedia/gocheck/cmd/gocheck@latest
 
 ## Usage
 
-### Basic Usage
-
 Run all linters:
 
 ```bash
 gocheck ./...
 ```
 
-Run specific linters:
-
-```bash
-gocheck -analyzers=untested,fieldorder ./...
-```
-
 ### Available Flags
 
-| Flag                  | Description                              | Default                 |
-| --------------------- | ---------------------------------------- | ----------------------- |
-| `-analyzers`          | Comma-separated list of analyzers to run | All available analyzers |
-| `-untested.internal`  | Check functions in internal packages     | `false`                 |
-| `-untested.generated` | Check functions in generated files       | `false`                 |
+> [!NOTE]
+> When you explicitly enable one analyzer (e.g., `-fieldorder`), it disables others unless they're also explicitly enabled.
+
+| Flag                  | Description                                          | Default |
+| --------------------- | ---------------------------------------------------- | ------- |
+| `-fieldorder`         | Enable fieldorder analysis                           | `true`  |
+| `-untested`           | Enable untested analysis                             | `true`  |
+| `-untested.internal`  | Check functions in internal packages                 | `false` |
+| `-untested.generated` | Check functions in generated files                   | `false` |
+| `-fix`                | Apply all suggested fixes                            | `false` |
+| `-json`               | Emit JSON output                                     | `false` |
+| `-test`               | Indicates whether test files should be analyzed, too | `true`  |
 
 ### Examples
 
-Run only the `untested` linter with default settings:
+Run only the `fieldorder` linter:
 
 ```bash
-gocheck -analyzers=untested ./...
+gocheck -fieldorder ./...
 ```
 
-Run `untested` linter including both internal packages and generated files:
+Run the `untested` linter including both internal packages and generated files:
 
 ```bash
-gocheck -analyzers=untested -untested.internal=true -untested.generated=true ./...
+gocheck -untested -untested.internal -untested.generated ./...
 ```
 
-Run both linters:
+Show available options:
 
 ```bash
-gocheck -analyzers=untested,fieldorder ./...
+gocheck help
 ```
